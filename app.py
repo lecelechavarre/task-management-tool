@@ -22,13 +22,13 @@ logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
 # Modern Color scheme
 APP_COLORS = {
     "bg_main": "#f8fafc",
-    "bg_card": "#ffffff",
-    "bg_header": "#ffffff",
+    "bg_card": "#f8fafc",
+    "bg_header": "#f8fafc",
     "text_primary": "#1e293b",
     "text_secondary": "#64748b",
     "accent": "#6366f1",
-    "border": "#e2e8f0",
-    "hover": "#eef2ff",
+    "border": "#f8fafc",
+    "hover": "#f8fafc",
     "success": "#10b981",
     "error": "#ef4444",
     "archive": "#94a3b8"
@@ -69,6 +69,33 @@ class TodoApp:
         self._render_archive()
         self._render_finished()
 
+    def _bind_mousewheel(self, widget, canvas):
+        """Bind mouse wheel events to canvas for scrolling"""
+        def on_mousewheel(event):
+            # For Windows and MacOS
+            if event.num == 5 or event.delta < 0:
+                canvas.yview_scroll(1, "units")
+            elif event.num == 4 or event.delta > 0:
+                canvas.yview_scroll(-1, "units")
+        
+        # Bind to widget and all its children
+        widget.bind("<Enter>", lambda e: self._bind_wheel_to_canvas(canvas))
+        widget.bind("<Leave>", lambda e: self._unbind_wheel_from_canvas(canvas))
+        
+    def _bind_wheel_to_canvas(self, canvas):
+        """Bind wheel events when mouse enters the area"""
+        # Windows/Linux
+        canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
+        # Linux alternative
+        canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
+        canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
+        
+    def _unbind_wheel_from_canvas(self, canvas):
+        """Unbind wheel events when mouse leaves the area"""
+        canvas.unbind_all("<MouseWheel>")
+        canvas.unbind_all("<Button-4>")
+        canvas.unbind_all("<Button-5>")
+
     def _load_archived_tasks(self):
         """Load archived tasks from archive file"""
         if os.path.exists(ARCHIVE_PATH):
@@ -91,88 +118,46 @@ class TodoApp:
             self.style.theme_use("clam")
         except:
             pass
-        
         default_font = ("Segoe UI", 10)
-        self.style.configure(".", 
-            font=default_font,
-            background=APP_COLORS["bg_main"]
-        )
-        
+        self.style.configure(".", font=default_font, background=APP_COLORS["bg_main"])
         self.style.configure("TFrame", background=APP_COLORS["bg_main"])
         
+        # Remove borders by setting borderwidth=0
         self.style.configure("Card.TFrame",
-            background=APP_COLORS["bg_card"],
-            relief="solid",
-            borderwidth=1,
-            bordercolor=APP_COLORS["border"]
-        )
+            background=APP_COLORS["bg_card"], 
+            relief="flat",  # Changed from "solid" to "flat"
+            borderwidth=0)  # Changed from 1 to 0
         
         self.style.configure("Archive.TFrame",
-            background=APP_COLORS["bg_card"],
-            relief="solid",
-            borderwidth=1,
-            bordercolor=APP_COLORS["archive"]
-        )
+            background=APP_COLORS["bg_card"], 
+            relief="flat",  # Changed from "solid" to "flat"
+            borderwidth=0)  # Changed from 1 to 0
         
-        self.style.configure("Header.TLabel", 
+        self.style.configure("Finished.TFrame",
+            background=APP_COLORS["bg_card"], 
+            relief="flat",  # Changed from "solid" to "flat"
+            borderwidth=0)  # Changed from 1 to 0
+        
+        self.style.configure("Header.TLabel",
             font=("Segoe UI", 20, "bold"),
-            foreground=APP_COLORS["text_primary"],
-            background=APP_COLORS["bg_card"]
-        )
-        
-        self.style.configure("Muted.TLabel", 
+            foreground=APP_COLORS["text_primary"], background=APP_COLORS["bg_card"])
+        self.style.configure("Muted.TLabel",
             font=("Segoe UI", 9),
-            foreground=APP_COLORS["text_secondary"],
-            background=APP_COLORS["bg_card"]
-        )
-        
-        self.style.configure("Archive.TLabel", 
+            foreground=APP_COLORS["text_secondary"], background=APP_COLORS["bg_card"])
+        self.style.configure("Archive.TLabel",
             font=("Segoe UI", 9),
-            foreground=APP_COLORS["archive"],
-            background=APP_COLORS["bg_card"]
-        )
-
+            foreground=APP_COLORS["archive"], background=APP_COLORS["bg_card"])
         self.style.configure("Finished.TLabel",
             font=("Segoe UI", 9),
-            foreground=APP_COLORS["success"],
-            background=APP_COLORS["bg_card"]
-        )
-        
-        self.style.configure("TButton", 
-            font=("Segoe UI", 10),
-            padding=(12, 6),
-            relief="flat",
-            borderwidth=1
-        )
-        
-        self.style.configure("Accent.TButton", 
-            font=("Segoe UI", 10, "bold"),
-            padding=(12, 6),
-            background=APP_COLORS["accent"],
-            foreground="white"
-        )
-        
-        self.style.configure("Success.TButton", 
-            background=APP_COLORS["success"],
-            foreground="white"
-        )
-        
-        self.style.configure("Danger.TButton", 
-            background=APP_COLORS["error"],
-            foreground="white"
-        )
-        
-        self.style.configure("Archive.TButton", 
-            background=APP_COLORS["archive"],
-            foreground="white"
-        )
-        
-        self.style.configure("TEntry", 
-            fieldbackground=APP_COLORS["bg_card"],
-            borderwidth=1,
-            relief="solid"
-        )
-        
+            foreground=APP_COLORS["success"], background=APP_COLORS["bg_card"])
+        self.style.configure("TButton", font=("Segoe UI", 10),
+                            padding=(12, 6), relief="flat", borderwidth=1)
+        self.style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"),
+                            padding=(12, 6), background=APP_COLORS["accent"], foreground="white")
+        self.style.configure("Success.TButton", background=APP_COLORS["success"], foreground="white")
+        self.style.configure("Danger.TButton", background=APP_COLORS["error"], foreground="white")
+        self.style.configure("Archive.TButton", background=APP_COLORS["archive"], foreground="white")
+        self.style.configure("TEntry", fieldbackground=APP_COLORS["bg_card"], borderwidth=1, relief="solid")
         self.root.configure(bg=APP_COLORS["bg_main"])
 
     def _build_ui(self):
@@ -283,6 +268,10 @@ class TodoApp:
         self.archive_frame.columnconfigure(0, weight=1)
         self.archive_frame.rowconfigure(0, weight=1)
 
+                # Bind mousewheel to archive section
+        self._bind_mousewheel(self.archive_frame, self.archive_canvas)
+        self._bind_mousewheel(self.archive_canvas, self.archive_canvas)
+
         # Finished card
         finished_card = ttk.Frame(left, style="Card.TFrame", padding=12)
         finished_card.grid(row=2, column=0, sticky="nwse", padx=12, pady=(12,0))
@@ -326,6 +315,10 @@ class TodoApp:
         self.finished_frame.columnconfigure(0, weight=1)
         self.finished_frame.rowconfigure(0, weight=1)
 
+        # Bind mousewheel to finished section
+        self._bind_mousewheel(self.finished_frame, self.finished_canvas)
+        self._bind_mousewheel(self.finished_canvas, self.finished_canvas)
+
         self._update_stats()
 
         self.task_canvas = tk.Canvas(right, borderwidth=0, highlightthickness=0, bg=APP_COLORS["bg_main"])
@@ -341,6 +334,10 @@ class TodoApp:
 
         self.task_canvas.grid(row=0, column=0, sticky="nswe")
         self.task_scroll.grid(row=0, column=1, sticky="ns")
+
+        # Bind mousewheel to main task list
+        self._bind_mousewheel(right, self.task_canvas)
+        self._bind_mousewheel(self.task_canvas, self.task_canvas)
 
         right.columnconfigure(0, weight=1)
         right.rowconfigure(0, weight=1)
