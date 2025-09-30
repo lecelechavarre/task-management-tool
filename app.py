@@ -21,14 +21,14 @@ logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
 
 # Modern Color scheme
 APP_COLORS = {
-    "bg_main": "#f8fafc",
-    "bg_card": "#f8fafc",
-    "bg_header": "#f8fafc",
+    "bg_main": "#ffffff",
+    "bg_card": "#ffffff",
+    "bg_header": "#ffffff",
     "text_primary": "#1e293b",
     "text_secondary": "#64748b",
     "accent": "#6366f1",
-    "border": "#f8fafc",
-    "hover": "#f8fafc",
+    "border": "#ffffff",
+    "hover": "#ffffff",
     "success": "#10b981",
     "error": "#ef4444",
     "archive": "#94a3b8"
@@ -46,7 +46,7 @@ PRIORITY_COLORS = {
 class TodoApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("To-Do Manager")
+        self.root.title("ＴＡＳＫＴＯＲＹ")
         
         screen_width = root.winfo_screenwidth()
         screen_height = root.winfo_screenheight()
@@ -165,8 +165,23 @@ class TodoApp:
         top.grid(row=0, column=0, columnspan=2, sticky="ew", padx=12, pady=(12,6))
         top.columnconfigure(1, weight=1)
 
-        title = ttk.Label(top, text="To-Do Manager", style="Header.TLabel")
-        title.grid(row=0, column=0, sticky="w", padx=6)
+        # Create frame for title with colored text
+        title_frame = tk.Frame(top, bg=APP_COLORS["bg_card"])
+        title_frame.grid(row=0, column=0, sticky="w", padx=)
+
+        # "To-Do" in green
+        todo_label = tk.Label(title_frame, text="Task", 
+                            font=("Segoe UI", 20, "bold"),
+                            foreground=APP_COLORS["success"],  # Green #10b981
+                            bg=APP_COLORS["bg_card"])
+        todo_label.pack(side="left")
+
+        # "Manager" in grey
+        manager_label = tk.Label(title_frame, text=" tory", 
+                                font=("Segoe UI", 20, "bold"),
+                                foreground=APP_COLORS["text_secondary"],  # Grey #64748b
+                                bg=APP_COLORS["bg_card"])
+        manager_label.pack(side="left")
 
         search_frame = ttk.Frame(top)
         search_frame.grid(row=0, column=1, sticky="ew", padx=12)
