@@ -13,6 +13,7 @@ from todo.utils import format_duration
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TASKS_PATH = os.path.join(BASE_DIR, "tasks.json")
 ARCHIVE_PATH = os.path.join(BASE_DIR, "archive.json")
+FINISHED_PATH = os.path.join(BASE_DIR, "finished.json")
 LOG_PATH = os.path.join(BASE_DIR, "todo.log")
 
 logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
@@ -56,8 +57,9 @@ class TodoApp:
         self.style = ttk.Style(root)
         self._setup_style()
 
-        # Load data - archive first, then active tasks
+        # Load data - archive, finished, then active tasks
         self.archived_tasks = self._load_archived_tasks()
+        self.finished_tasks = self._load_finished_tasks()
         self.tasks = self._load_active_tasks()
         self.timers = {}
         self.timer_labels = {}
@@ -65,6 +67,7 @@ class TodoApp:
         self._build_ui()
         self._render_tasks()
         self._render_archive()
+        self._render_finished()
 
     def _load_archived_tasks(self):
         """Load archived tasks from archive file"""
@@ -72,10 +75,16 @@ class TodoApp:
             return storage.load_tasks(ARCHIVE_PATH)
         return []
 
+    def _load_finished_tasks(self):
+        """Load finished tasks from finished file"""
+        if os.path.exists(FINISHED_PATH):
+            return storage.load_tasks(FINISHED_PATH)
+        return []
+
     def _load_active_tasks(self):
-        """Load active tasks, excluding any that are marked as archived"""
+        """Load active tasks, excluding archived and finished tasks"""
         all_tasks = storage.load_tasks(TASKS_PATH)
-        return [task for task in all_tasks if getattr(task, 'status', 'pending') != 'archived']
+        return [task for task in all_tasks if getattr(task, 'status', 'pending') not in ('archived', 'done')]
 
     def _setup_style(self):
         try:
@@ -120,6 +129,12 @@ class TodoApp:
         self.style.configure("Archive.TLabel", 
             font=("Segoe UI", 9),
             foreground=APP_COLORS["archive"],
+            background=APP_COLORS["bg_card"]
+        )
+
+        self.style.configure("Finished.TLabel",
+            font=("Segoe UI", 9),
+            foreground=APP_COLORS["success"],
             background=APP_COLORS["bg_card"]
         )
         
@@ -223,9 +238,10 @@ class TodoApp:
                                    style="Muted.TLabel")
         self.stats_label.grid(row=1, column=0, sticky="w", pady=(8,0))
         
+        # Archive card
         archive_card = ttk.Frame(left, style="Archive.TFrame", padding=12)
         archive_card.grid(row=1, column=0, sticky="nwse", padx=12, pady=(12,0))
-        left.rowconfigure(1, weight=1)
+        left.rowconfigure(1, weight=0)
         
         archive_header = ttk.Frame(archive_card)
         archive_header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
@@ -244,11 +260,12 @@ class TodoApp:
         self.archive_frame.grid(row=1, column=0, sticky="nsew", pady=(8,0))
         archive_card.rowconfigure(1, weight=1)
         
+        archive_canvas_height = 150
         self.archive_canvas = tk.Canvas(self.archive_frame, 
                                       borderwidth=0, 
                                       highlightthickness=0, 
                                       bg=APP_COLORS["bg_card"],
-                                      height=200)
+                                      height=archive_canvas_height)
         self.archive_scroll = ttk.Scrollbar(self.archive_frame, 
                                           orient="vertical", 
                                           command=self.archive_canvas.yview)
@@ -265,6 +282,49 @@ class TodoApp:
         self.archive_scroll.grid(row=0, column=1, sticky="ns")
         self.archive_frame.columnconfigure(0, weight=1)
         self.archive_frame.rowconfigure(0, weight=1)
+
+        # Finished card
+        finished_card = ttk.Frame(left, style="Card.TFrame", padding=12)
+        finished_card.grid(row=2, column=0, sticky="nwse", padx=12, pady=(12,0))
+        left.rowconfigure(2, weight=1)
+        
+        finished_header = ttk.Frame(finished_card)
+        finished_header.grid(row=0, column=0, sticky="ew", pady=(0, 8))
+        finished_header.columnconfigure(1, weight=1)
+        
+        finished_title = ttk.Label(finished_header, text="✨ Finished", 
+                                  font=("Segoe UI", 12, "bold"),
+                                  foreground=APP_COLORS["success"])
+        finished_title.grid(row=0, column=0, sticky="w")
+        
+        self.finished_count_label = ttk.Label(finished_header, text="", 
+                                             style="Finished.TLabel")
+        self.finished_count_label.grid(row=0, column=1, sticky="e")
+        
+        self.finished_frame = ttk.Frame(finished_card)
+        self.finished_frame.grid(row=1, column=0, sticky="nsew", pady=(8,0))
+        finished_card.rowconfigure(1, weight=1)
+        
+        finished_canvas_height = 150
+        self.finished_canvas = tk.Canvas(self.finished_frame,
+                                        borderwidth=0,
+                                        highlightthickness=0,
+                                        bg=APP_COLORS["bg_card"],
+                                        height=finished_canvas_height)
+        self.finished_scroll = ttk.Scrollbar(self.finished_frame,
+                                            orient="vertical",
+                                            command=self.finished_canvas.yview)
+        self.finished_list_frame = ttk.Frame(self.finished_canvas)
+        self.finished_list_frame.bind(
+            "<Configure>",
+            lambda e: self.finished_canvas.configure(scrollregion=self.finished_canvas.bbox("all"))
+        )
+        self.finished_canvas.create_window((0,0), window=self.finished_list_frame, anchor="nw")
+        self.finished_canvas.configure(yscrollcommand=self.finished_scroll.set)
+        self.finished_canvas.grid(row=0, column=0, sticky="nsew")
+        self.finished_scroll.grid(row=0, column=1, sticky="ns")
+        self.finished_frame.columnconfigure(0, weight=1)
+        self.finished_frame.rowconfigure(0, weight=1)
 
         self._update_stats()
 
@@ -295,7 +355,7 @@ class TodoApp:
             no_archive_label = ttk.Label(self.archive_list_frame, 
                                        text="No archived tasks", 
                                        style="Archive.TLabel")
-            no_archive_label.pack(pady=20)
+            no_archive_label.pack(pady=10)
             return
         
         sorted_archive = sorted(self.archived_tasks, 
@@ -304,6 +364,25 @@ class TodoApp:
         
         for i, task in enumerate(sorted_archive):
             self._create_archive_item(task, i)
+
+        self._update_stats()
+
+    def _render_finished(self):
+        for child in self.finished_list_frame.winfo_children():
+            child.destroy()
+
+        if not self.finished_tasks:
+            no_finished_label = ttk.Label(self.finished_list_frame,
+                                         text="No finished tasks",
+                                         style="Finished.TLabel")
+            no_finished_label.pack(pady=10)
+            return
+
+        sorted_finished = sorted(self.finished_tasks, key=lambda t: t.created_at, reverse=True)
+        for i, task in enumerate(sorted_finished):
+            self._create_finished_item(task, i)
+
+        self._update_stats()
 
     def _truncate_text(self, text, max_length=25):
         if len(text) <= max_length:
@@ -345,6 +424,40 @@ class TodoApp:
                               command=lambda t=task: self._permanently_delete_task(t))
         delete_btn.grid(row=0, column=1, padx=2)
 
+    def _create_finished_item(self, task: Task, index: int):
+        item_frame = ttk.Frame(self.finished_list_frame, style="Card.TFrame", padding=8)
+        item_frame.pack(fill="x", padx=2, pady=2)
+        
+        item_frame.columnconfigure(0, weight=0, minsize=30)
+        item_frame.columnconfigure(1, weight=1, minsize=100)
+        item_frame.columnconfigure(2, weight=0, minsize=80)
+        
+        icon_label = ttk.Label(item_frame, text="✨", font=("Segoe UI", 10))
+        icon_label.grid(row=0, column=0, sticky="w", padx=(0, 8))
+        
+        truncated_title = self._truncate_text(task.title, max_length=25)
+        title_label = ttk.Label(item_frame, 
+                              text=f"✓ {truncated_title}", 
+                              font=("Segoe UI", 10),
+                              foreground=APP_COLORS["text_secondary"],
+                              cursor="hand2")
+        title_label.grid(row=0, column=1, sticky="w")
+        title_label.bind("<Button-1>", lambda e, t=task: self._show_finished_task_details(t))
+        
+        btn_frame = ttk.Frame(item_frame)
+        btn_frame.grid(row=0, column=2, sticky="e")
+        
+        reopen_btn = ttk.Button(btn_frame, text="🔄", 
+                               width=3,
+                               command=lambda t=task: self._undo_done(t))
+        reopen_btn.grid(row=0, column=0, padx=2)
+        
+        delete_btn = ttk.Button(btn_frame, text="🗑️", 
+                              width=3,
+                              style="Danger.TButton",
+                              command=lambda t=task: self._permanently_delete_finished_task(t))
+        delete_btn.grid(row=0, column=1, padx=2)
+
     def _show_archived_task_details(self, task: Task):
         modal = tk.Toplevel(self.root)
         modal.transient(self.root)
@@ -380,14 +493,15 @@ class TodoApp:
             bg=header["bg"],
             fg="white",
             font=("Segoe UI", 11))
-        status_label.pack(side="left", pady=(0, 10))
+        status_label.pack(anchor="w", pady=(0, 10))
         
         title_label = tk.Label(header_content,
             text=task.title,
             bg=header["bg"],
             fg="white",
             font=("Segoe UI", 24, "bold"),
-            wraplength=600)
+            wraplength=600,
+            justify="left")
         title_label.pack(fill="x", anchor="w")
 
         content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
@@ -405,7 +519,7 @@ class TodoApp:
         desc_text = ScrolledText(desc_frame,
             wrap=tk.WORD,
             font=("Segoe UI", 10),
-            height=15,
+            height=12,
             relief="flat",
             borderwidth=1)
         desc_text.pack(fill="both", expand=True)
@@ -426,23 +540,101 @@ class TodoApp:
             command=modal.destroy)
         close_btn.pack(side="right")
 
+    def _show_finished_task_details(self, task: Task):
+        modal = tk.Toplevel(self.root)
+        modal.transient(self.root)
+        modal.grab_set()
+        
+        window_width = 700
+        window_height = 550
+        header_height = 80
+        
+        root_x = self.root.winfo_x()
+        root_y = self.root.winfo_y()
+        root_width = self.root.winfo_width()
+        
+        position_x = root_x + (root_width - window_width) // 2
+        position_y = root_y + header_height
+        
+        modal.geometry(f"{window_width}x{window_height}+{position_x}+{position_y}")
+        modal.title("Finished Task Details")
+        modal.configure(bg=APP_COLORS["bg_main"])
+        modal.resizable(False, False)
+
+        container = ttk.Frame(modal, style="Card.TFrame", padding=0)
+        container.pack(fill="both", expand=True, padx=20, pady=20)
+
+        header = tk.Frame(container, bg=APP_COLORS["success"])
+        header.pack(fill="x")
+        
+        header_content = tk.Frame(header, bg=header["bg"])
+        header_content.pack(fill="x", padx=25, pady=20)
+
+        status_label = tk.Label(header_content,
+            text="✨ FINISHED TASK",
+            bg=header["bg"],
+            fg="white",
+            font=("Segoe UI", 11))
+        status_label.pack(anchor="w", pady=(0, 10))
+        
+        title_label = tk.Label(header_content,
+            text=task.title,
+            bg=header["bg"],
+            fg="white",
+            font=("Segoe UI", 24, "bold"),
+            wraplength=600,
+            justify="left")
+        title_label.pack(fill="x", anchor="w")
+
+        content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
+        content.pack(fill="both", expand=True)
+
+        desc_frame = ttk.Frame(content)
+        desc_frame.pack(fill="both", expand=True, pady=(0, 20))
+        
+        desc_header = ttk.Label(desc_frame,
+            text="📝 Description",
+            font=("Segoe UI", 12, "bold"),
+            foreground=APP_COLORS["text_primary"])
+        desc_header.pack(anchor="w", pady=(0, 10))
+        
+        desc_text = ScrolledText(desc_frame,
+            wrap=tk.WORD,
+            font=("Segoe UI", 10),
+            height=12,
+            relief="flat",
+            borderwidth=1)
+        desc_text.pack(fill="both", expand=True)
+        desc_text.insert("1.0", task.description if task.description else "(No description provided)")
+        desc_text.configure(state="disabled")
+
+        btn_frame = ttk.Frame(content)
+        btn_frame.pack(fill="x")
+
+        reopen_btn = ttk.Button(btn_frame,
+            text="🔄 Reopen Task",
+            command=lambda: [modal.destroy(), self._undo_done(task)])
+        reopen_btn.pack(side="left")
+
+        delete_btn = ttk.Button(btn_frame,
+            text="🗑️ Delete Permanently",
+            style="Danger.TButton",
+            command=lambda: [modal.destroy(), self._permanently_delete_finished_task(task)])
+        delete_btn.pack(side="left", padx=8)
+
+        close_btn = ttk.Button(btn_frame,
+            text="Close",
+            command=modal.destroy)
+        close_btn.pack(side="right")
+
     def _restore_task(self, task: Task):
-        """Restore a task from archive to active tasks.
-        CRITICAL: Only removes the SPECIFIC task being restored from archive."""
-        
-        # Build new archived list WITHOUT the task being restored
-        # This preserves ALL other archived tasks
         self.archived_tasks = [t for t in self.archived_tasks if t.id != task.id]
-        
-        # Reset the task status to pending and add to active tasks
         task.status = "pending"
         self.tasks.append(task)
         
-        # Save both files
         storage.save_tasks(TASKS_PATH, self.tasks)
         storage.save_tasks(ARCHIVE_PATH, self.archived_tasks)
         
-        # Update UI
         self._update_stats()
         self._render_tasks()
         self._render_archive()
@@ -450,24 +642,22 @@ class TodoApp:
         logging.info(f"Restored task {task.id}: {task.title}. Remaining archived: {len(self.archived_tasks)}")
 
     def _permanently_delete_task(self, task: Task):
-        """Permanently delete a task from archive.
-        CRITICAL: Only removes the SPECIFIC task being deleted from archive."""
-        
         if messagebox.askyesno("Permanent Delete", 
                              f"Permanently delete task '{task.title}'?\n\nThis action cannot be undone."):
-            
-            # Build new archived list WITHOUT the task being deleted
-            # This preserves ALL other archived tasks
             self.archived_tasks = [t for t in self.archived_tasks if t.id != task.id]
-            
-            # Save archive file
             storage.save_tasks(ARCHIVE_PATH, self.archived_tasks)
-            
-            # Update UI
             self._update_stats()
             self._render_archive()
-            
             logging.info(f"Permanently deleted task {task.id}: {task.title}. Remaining archived: {len(self.archived_tasks)}")
+
+    def _permanently_delete_finished_task(self, task: Task):
+        if messagebox.askyesno("Permanent Delete", 
+                             f"Permanently delete finished task '{task.title}'?\n\nThis action cannot be undone."):
+            self.finished_tasks = [t for t in self.finished_tasks if t.id != task.id]
+            storage.save_tasks(FINISHED_PATH, self.finished_tasks)
+            self._update_stats()
+            self._render_finished()
+            logging.info(f"Permanently deleted finished task {task.id}: {task.title}. Remaining finished: {len(self.finished_tasks)}")
 
     def _archive_task(self, task: Task):
         if task.id in self.timers:
@@ -495,7 +685,7 @@ class TodoApp:
     def _update_stats(self):
         total = len(self.tasks)
         pending = sum(1 for t in self.tasks if t.status != "done")
-        done = total - pending
+        done = len(self.finished_tasks)
         high = sum(1 for t in self.tasks if t.priority == "high" and t.status != "done")
         archived = len(self.archived_tasks)
         
@@ -504,6 +694,7 @@ class TodoApp:
         
         archive_txt = f"({archived} items)"
         self.archive_count_label.config(text=archive_txt)
+        self.finished_count_label.config(text=f"({done} items)")
 
     def _render_tasks(self):
         for child in self.task_frame.winfo_children():
@@ -670,7 +861,8 @@ class TodoApp:
             bg=header["bg"],
             fg="white",
             font=("Segoe UI", 24, "bold"),
-            wraplength=600)
+            wraplength=600,
+            justify="left")
         title_label.pack(fill="x", anchor="w")
 
         content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
@@ -727,7 +919,7 @@ class TodoApp:
         desc_text = ScrolledText(desc_frame,
             wrap=tk.WORD,
             font=("Segoe UI", 10),
-            height=10,
+            height=8,
             relief="flat",
             borderwidth=1)
         desc_text.pack(fill="both", expand=True)
@@ -883,7 +1075,7 @@ class TodoApp:
             due = due_var.get().strip() or None
 
             if task is None:
-                new_id = storage.get_next_id(self.tasks)
+                new_id = storage.get_next_id(self.tasks + self.archived_tasks + self.finished_tasks)
                 start_time = datetime.now()
                 new_task = Task(
                     id=new_id,
@@ -912,19 +1104,40 @@ class TodoApp:
         save_btn.config(command=on_save)
 
     def _mark_done(self, task: Task):
-        task.status = "done"
-        task.remaining_seconds = 0
         if task.id in self.timers:
             self._stop_timer(task.id)
+
+        self.tasks = [t for t in self.tasks if t.id != task.id]
+
+        task.status = "done"
+        task.remaining_seconds = max(0, task.remaining_seconds or 0)
+        self.finished_tasks.append(task)
+
         storage.save_tasks(TASKS_PATH, self.tasks)
+        storage.save_tasks(FINISHED_PATH, self.finished_tasks)
+
         self._render_tasks()
+        self._render_finished()
+        self._update_stats()
+
+        logging.info(f"Marked done task {task.id}: {task.title}")
 
     def _undo_done(self, task: Task):
+        self.finished_tasks = [t for t in self.finished_tasks if t.id != task.id]
+
         task.status = "pending"
         if task.remaining_seconds == 0:
             task.remaining_seconds = task.duration_seconds
+        self.tasks.append(task)
+
         storage.save_tasks(TASKS_PATH, self.tasks)
+        storage.save_tasks(FINISHED_PATH, self.finished_tasks)
+
         self._render_tasks()
+        self._render_finished()
+        self._update_stats()
+
+        logging.info(f"Reopened finished task {task.id}: {task.title}")
 
     def _delete_task(self, task: Task):
         self._archive_task(task)
@@ -946,7 +1159,7 @@ class TodoApp:
         def tick():
             for t in self.tasks:
                 if t.id == task.id:
-                    t.remaining_seconds = int(t.remaining_seconds + 1)
+                    t.remaining_seconds = int((t.remaining_seconds or 0) + 1)
                     break
             lbl = self.timer_labels.get(task.id)
             if lbl:
@@ -989,6 +1202,7 @@ def on_close(root, app: TodoApp):
         app._stop_timer(tid)
     storage.save_tasks(TASKS_PATH, app.tasks)
     storage.save_tasks(ARCHIVE_PATH, app.archived_tasks)
+    storage.save_tasks(FINISHED_PATH, app.finished_tasks)
     root.destroy()
 
 if __name__ == "__main__":
