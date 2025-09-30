@@ -384,7 +384,7 @@ class TodoApp:
 
         self._update_stats()
 
-    def _truncate_text(self, text, max_length=25):
+    def _truncate_text(self, text, max_length=40):
         if len(text) <= max_length:
             return text
         return text[:max_length-3] + "..."
@@ -757,14 +757,17 @@ class TodoApp:
         )
         badge.grid(row=0, column=0, rowspan=2, sticky="nsw", padx=(0,16))
 
-        title_txt = task.title
+        # Fixed width title label - exactly 40 characters
+        title_txt = self._truncate_text(task.title, max_length=40)
         if task.status == "done":
             title_txt = "✓ " + title_txt
+        
         title_lbl = ttk.Label(card, 
             text=title_txt, 
             font=("Segoe UI", 12, "bold"),
             foreground=APP_COLORS["text_primary"] if task.status != "done" else APP_COLORS["text_secondary"],
-            cursor="hand2")
+            cursor="hand2",
+            width=40)
         title_lbl.grid(row=0, column=1, sticky="w")
         
         title_lbl.bind("<Button-1>", lambda e, t=task: self._show_task_details(t))
@@ -994,7 +997,8 @@ class TodoApp:
             bg=header_color,
             insertbackground="white",
             relief="flat",
-            highlightthickness=0)
+            highlightthickness=0,
+            width=40)
         title_entry.pack(fill="x", pady=(5, 0))
         
         content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
