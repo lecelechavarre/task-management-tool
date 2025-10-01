@@ -596,14 +596,31 @@ class TodoApp:
         icon_label = ttk.Label(item_frame, text="✨", font=("Segoe UI", 10))
         icon_label.grid(row=0, column=0, sticky="w", padx=(0, 8))
         
+        # Main content frame
+        content_frame = ttk.Frame(item_frame)
+        content_frame.grid(row=0, column=1, sticky="w")
+        
         truncated_title = self._truncate_text(task.title, max_length=25)
-        title_label = ttk.Label(item_frame, 
+        title_label = ttk.Label(content_frame, 
                               text=f"✓ {truncated_title}", 
                               font=("Segoe UI", 10),
                               foreground=APP_COLORS["text_secondary"],
                               cursor="hand2")
-        title_label.grid(row=0, column=1, sticky="w")
+        title_label.pack(anchor="w")
         title_label.bind("<Button-1>", lambda e, t=task: self._show_finished_task_details(t))
+        
+        # Show completion date/time
+        if hasattr(task, 'completed_at') and task.completed_at:
+            try:
+                completed_dt = datetime.fromisoformat(task.completed_at)
+                completed_str = completed_dt.strftime("%b %d, %Y %I:%M %p")
+                completed_label = ttk.Label(content_frame,
+                                          text=f"Completed: {completed_str}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["success"])
+                completed_label.pack(anchor="w")
+            except:
+                pass
         
         btn_frame = ttk.Frame(item_frame)
         btn_frame.grid(row=0, column=2, sticky="e")
@@ -749,6 +766,52 @@ class TodoApp:
 
         content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
         content.pack(fill="both", expand=True)
+
+        # Date information frame
+        dates_frame = ttk.Frame(content)
+        dates_frame.pack(fill="x", pady=(0, 20))
+        
+        # Created date
+        created_date = datetime.fromisoformat(task.created_at).strftime("%B %d, %Y at %I:%M %p")
+        created_label = ttk.Label(dates_frame,
+            text=f"📅 Created: {created_date}",
+            style="Muted.TLabel")
+        created_label.pack(anchor="w", pady=2)
+        
+        # Completed date
+        if hasattr(task, 'completed_at') and task.completed_at:
+            try:
+                completed_date = datetime.fromisoformat(task.completed_at).strftime("%B %d, %Y at %I:%M %p")
+                completed_label = ttk.Label(dates_frame,
+                    text=f"✨ Completed: {completed_date}",
+                    font=("Segoe UI", 10, "bold"),
+                    foreground=APP_COLORS["success"])
+                completed_label.pack(anchor="w", pady=2)
+                
+                # Calculate duration
+                created_dt = datetime.fromisoformat(task.created_at)
+                completed_dt = datetime.fromisoformat(task.completed_at)
+                duration = completed_dt - created_dt
+                days = duration.days
+                hours = duration.seconds // 3600
+                minutes = (duration.seconds % 3600) // 60
+                
+                duration_parts = []
+                if days > 0:
+                    duration_parts.append(f"{days} day{'s' if days != 1 else ''}")
+                if hours > 0:
+                    duration_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+                if minutes > 0:
+                    duration_parts.append(f"{minutes} min{'s' if minutes != 1 else ''}")
+                
+                duration_str = ", ".join(duration_parts) if duration_parts else "Less than a minute"
+                
+                duration_label = ttk.Label(dates_frame,
+                    text=f"⏱️ Duration: {duration_str}",
+                    style="Muted.TLabel")
+                duration_label.pack(anchor="w", pady=2)
+            except:
+                pass
 
         desc_frame = ttk.Frame(content)
         desc_frame.pack(fill="both", expand=True, pady=(0, 20))
@@ -936,7 +999,14 @@ class TodoApp:
         desc_lbl = ttk.Label(card, text=desc_txt, style="Muted.TLabel")
         desc_lbl.grid(row=1, column=1, sticky="w")
 
-        meta = f"Created: {task.created_at.split('T')[0]}"
+        # Format date and time display with creation time
+        try:
+            created_dt = datetime.fromisoformat(task.created_at)
+            created_display = created_dt.strftime("%Y-%m-%d %I:%M %p")
+            meta = f"Created: {created_display}"
+        except:
+            meta = f"Created: {task.created_at.split('T')[0]}"
+            
         if task.due_date:
             meta += f"  •  Due: {task.due_date}"
         meta_lbl = ttk.Label(card, text=meta, style="Muted.TLabel")
@@ -1058,7 +1128,7 @@ class TodoApp:
         dates_frame = ttk.Frame(meta_frame)
         dates_frame.pack(side="right")
         
-        created_date = datetime.fromisoformat(task.created_at).strftime("%B %d, %Y at %H:%M")
+        created_date = datetime.fromisoformat(task.created_at).strftime("%B %d, %Y at %I:%M %p")
         created_label = ttk.Label(dates_frame,
             text=f"📅 Created: {created_date}",
             style="Muted.TLabel")
@@ -1275,6 +1345,10 @@ class TodoApp:
 
         task.status = "done"
         task.remaining_seconds = max(0, task.remaining_seconds or 0)
+        
+        # Add completion timestamp
+        task.completed_at = datetime.now().isoformat()
+        
         self.finished_tasks.append(task)
 
         storage.save_tasks(TASKS_PATH, self.tasks)
@@ -1284,7 +1358,7 @@ class TodoApp:
         self._render_finished()
         self._update_stats()
 
-        logging.info(f"Marked done task {task.id}: {task.title}")
+        logging.info(f"Marked done task {task.id}: {task.title} at {task.completed_at}")
 
     def _undo_done(self, task: Task):
         self.finished_tasks = [t for t in self.finished_tasks if t.id != task.id]
