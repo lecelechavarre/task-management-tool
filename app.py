@@ -252,7 +252,16 @@ class TodoApp:
     def _load_archived_tasks(self):
         """Load archived tasks from archive file"""
         if os.path.exists(ARCHIVE_PATH):
-            return storage.load_tasks(ARCHIVE_PATH)
+            tasks = storage.load_tasks(ARCHIVE_PATH)
+            # Ensure archived_at attribute exists on all archived tasks
+            for task in tasks:
+                if not hasattr(task, 'archived_at') or task.archived_at is None:
+                    # Use created_at as fallback for old archived tasks
+                    if hasattr(task, 'created_at') and task.created_at:
+                        task.archived_at = task.created_at
+                    else:
+                        task.archived_at = datetime.now().isoformat()
+            return tasks
         return []
 
     def _load_finished_tasks(self):
@@ -531,7 +540,7 @@ class TodoApp:
             return
         
         sorted_archive = sorted(self.archived_tasks, 
-                              key=lambda t: t.created_at, 
+                              key=lambda t: t.archived_at if hasattr(t, 'archived_at') else t.created_at, 
                               reverse=True)
         
         for i, task in enumerate(sorted_archive):
@@ -572,14 +581,36 @@ class TodoApp:
         icon_label = ttk.Label(item_frame, text="🗂️", font=("Segoe UI", 10))
         icon_label.grid(row=0, column=0, sticky="w", padx=(0, 8))
         
+        # Main content frame
+        content_frame = ttk.Frame(item_frame)
+        content_frame.grid(row=0, column=1, sticky="w")
+        
         truncated_title = self._truncate_text(task.title, max_length=25)
-        title_label = ttk.Label(item_frame, 
+        title_label = ttk.Label(content_frame, 
                               text=truncated_title, 
                               font=("Segoe UI", 10),
                               foreground=APP_COLORS["archive"],
                               cursor="hand2")
-        title_label.grid(row=0, column=1, sticky="w")
+        title_label.pack(anchor="w")
         title_label.bind("<Button-1>", lambda e, t=task: self._show_archived_task_details(t))
+        
+        # Show archived date/time - NEW SECTION
+        if hasattr(task, 'archived_at') and task.archived_at:
+            try:
+                archived_dt = datetime.fromisoformat(task.archived_at)
+                archived_str = archived_dt.strftime("%b %d, %Y %I:%M %p")
+                archived_label = ttk.Label(content_frame,
+                                          text=f"Archived: {archived_str}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["archive"])
+                archived_label.pack(anchor="w")
+            except Exception as e:
+                # Fallback if date parsing fails
+                archived_label = ttk.Label(content_frame,
+                                          text=f"Archived: {task.archived_at}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["archive"])
+                archived_label.pack(anchor="w")
         
         btn_frame = ttk.Frame(item_frame)
         btn_frame.grid(row=0, column=2, sticky="e")
@@ -594,6 +625,62 @@ class TodoApp:
                               width=3,
                               style="Danger.TButton",
                               command=lambda t=task: self._permanently_delete_task(t))
+        delete_btn.grid(row=0, column=1, padx=2)
+
+    def _create_finished_item(self, task: Task, index: int):
+        item_frame = ttk.Frame(self.finished_list_frame, style="Card.TFrame", padding=8)
+        item_frame.pack(fill="x", padx=2, pady=2)
+        
+        item_frame.columnconfigure(0, weight=0, minsize=30)
+        item_frame.columnconfigure(1, weight=1, minsize=100)
+        item_frame.columnconfigure(2, weight=0, minsize=80)
+        
+        icon_label = ttk.Label(item_frame, text="✨", font=("Segoe UI", 10))
+        icon_label.grid(row=0, column=0, sticky="w", padx=(0, 8))
+        
+        # Main content frame
+        content_frame = ttk.Frame(item_frame)
+        content_frame.grid(row=0, column=1, sticky="w")
+        
+        truncated_title = self._truncate_text(task.title, max_length=25)
+        title_label = ttk.Label(content_frame, 
+                              text=f"✓ {truncated_title}", 
+                              font=("Segoe UI", 10),
+                              foreground=APP_COLORS["text_secondary"],
+                              cursor="hand2")
+        title_label.pack(anchor="w")
+        title_label.bind("<Button-1>", lambda e, t=task: self._show_finished_task_details(t))
+        
+        # Show completion date/time
+        if hasattr(task, 'completed_at') and task.completed_at:
+            try:
+                completed_dt = datetime.fromisoformat(task.completed_at)
+                completed_str = completed_dt.strftime("%b %d, %Y %I:%M %p")
+                completed_label = ttk.Label(content_frame,
+                                          text=f"Completed: {completed_str}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["success"])
+                completed_label.pack(anchor="w")
+            except Exception as e:
+                # Fallback if date parsing fails
+                completed_label = ttk.Label(content_frame,
+                                          text=f"Completed: {task.completed_at}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["success"])
+                completed_label.pack(anchor="w")
+        
+        btn_frame = ttk.Frame(item_frame)
+        btn_frame.grid(row=0, column=2, sticky="e")
+        
+        reopen_btn = ttk.Button(btn_frame, text="🔄", 
+                               width=3,
+                               command=lambda t=task: self._undo_done(t))
+        reopen_btn.grid(row=0, column=0, padx=2)
+        
+        delete_btn = ttk.Button(btn_frame, text="🗑️", 
+                              width=3,
+                              style="Danger.TButton",
+                              command=lambda t=task: self._permanently_delete_finished_task(t))
         delete_btn.grid(row=0, column=1, padx=2)
 
     def _create_finished_item(self, task: Task, index: int):
