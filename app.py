@@ -258,8 +258,19 @@ class TodoApp:
     def _load_finished_tasks(self):
         """Load finished tasks from finished file"""
         if os.path.exists(FINISHED_PATH):
-            return storage.load_tasks(FINISHED_PATH)
+            tasks = storage.load_tasks(FINISHED_PATH)
+            # Ensure completed_at attribute exists on all finished tasks
+            for task in tasks:
+                # If completed_at doesn't exist or is None, set a default
+                if not hasattr(task, 'completed_at') or task.completed_at is None:
+                    # Use created_at as fallback for old tasks without completion time
+                    if hasattr(task, 'created_at') and task.created_at:
+                        task.completed_at = task.created_at
+                    else:
+                        task.completed_at = datetime.now().isoformat()
+            return tasks
         return []
+        
 
     def _load_active_tasks(self):
         """Load active tasks, excluding archived and finished tasks"""
@@ -609,7 +620,7 @@ class TodoApp:
         title_label.pack(anchor="w")
         title_label.bind("<Button-1>", lambda e, t=task: self._show_finished_task_details(t))
         
-        # Show completion date/time
+        # Show completion date/time - FIXED SECTION
         if hasattr(task, 'completed_at') and task.completed_at:
             try:
                 completed_dt = datetime.fromisoformat(task.completed_at)
@@ -619,8 +630,13 @@ class TodoApp:
                                           font=("Segoe UI", 8),
                                           foreground=APP_COLORS["success"])
                 completed_label.pack(anchor="w")
-            except:
-                pass
+            except Exception as e:
+                # Fallback if date parsing fails
+                completed_label = ttk.Label(content_frame,
+                                          text=f"Completed: {task.completed_at}",
+                                          font=("Segoe UI", 8),
+                                          foreground=APP_COLORS["success"])
+                completed_label.pack(anchor="w")
         
         btn_frame = ttk.Frame(item_frame)
         btn_frame.grid(row=0, column=2, sticky="e")
@@ -1346,7 +1362,7 @@ class TodoApp:
         task.status = "done"
         task.remaining_seconds = max(0, task.remaining_seconds or 0)
         
-        # Add completion timestamp
+        # CRITICAL FIX: Add completion timestamp
         task.completed_at = datetime.now().isoformat()
         
         self.finished_tasks.append(task)
@@ -1364,6 +1380,8 @@ class TodoApp:
         self.finished_tasks = [t for t in self.finished_tasks if t.id != task.id]
 
         task.status = "pending"
+        # Clear completion timestamp when reopening
+        task.completed_at = None
         if task.remaining_seconds == 0:
             task.remaining_seconds = task.duration_seconds
         self.tasks.append(task)
