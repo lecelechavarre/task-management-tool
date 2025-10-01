@@ -6,13 +6,14 @@ from typing import Optional
 class Task:
     id: int
     title: str
-    description: str = ""
-    status: str = "pending"   # "pending" or "done"
-    priority: str = "low"     # "low", "medium", "high"
-    created_at: str = None    # ISO timestamp
+    description: str
+    status: str
+    priority: str
+    created_at: str
     due_date: Optional[str] = None
     duration_seconds: int = 0
     remaining_seconds: int = 0
+    completed_at: Optional[str] = None
 
     def __post_init__(self):
         if self.created_at is None:
@@ -34,4 +35,5 @@ class Task:
             due_date=d.get("due_date"),
             duration_seconds=int(d.get("duration_seconds", 0)),
             remaining_seconds=int(d.get("remaining_seconds", d.get("duration_seconds", 0))),
+            completed_at=d.get("completed_at")  # THIS LINE WAS MISSING - THIS IS THE FIX!
         )
