@@ -8,6 +8,8 @@ from tkinter.scrolledtext import ScrolledText
 from todo.models import Task
 from todo import storage
 from todo.utils import format_duration
+from PIL import Image, ImageTk
+
 
 # ---------- Configuration ----------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -161,27 +163,35 @@ class TodoApp:
         self.root.configure(bg=APP_COLORS["bg_main"])
 
     def _build_ui(self):
-        top = ttk.Frame(self.root, padding=(12,10), style="Card.TFrame")
-        top.grid(row=0, column=0, columnspan=2, sticky="ew", padx=12, pady=(12,6))
+        # --- Top bar ---
+        top = ttk.Frame(self.root, padding=(10), style="Card.TFrame")
+        top.grid(row=0, column=0, columnspan=3, sticky="ew", padx=12, pady=(12,6))
         top.columnconfigure(1, weight=1)
 
-        # Create frame for title with colored text
-        title_frame = tk.Frame(top, bg=APP_COLORS["bg_card"])
-        title_frame.grid(row=0, column=0, sticky="w", padx=)
+        # Create canvas for title with K and O in different color
+        # Logo and title frame
+        logo_title_frame = ttk.Frame(top)
+        logo_title_frame.grid(row=0, column=0, sticky="w", padx=6)
 
-        # "To-Do" in green
-        todo_label = tk.Label(title_frame, text="Task", 
-                            font=("Segoe UI", 20, "bold"),
-                            foreground=APP_COLORS["success"],  # Green #10b981
-                            bg=APP_COLORS["bg_card"])
-        todo_label.pack(side="left")
+        # Load and display logo
+        try:
+            logo_path = os.path.join(BASE_DIR, "/images/logo.png")  # if in same folder
+            # OR
+            logo_path = os.path.join(BASE_DIR, "images", "logo.png")  # if in subfolder
+            
+            logo_image = Image.open(logo_path)
+            logo_image = logo_image.resize((240, 50), Image.LANCZOS)
+            logo_photo = ImageTk.PhotoImage(logo_image)
+            
+            logo_label = tk.Label(logo_title_frame, image=logo_photo, bg=APP_COLORS["bg_card"])
+            logo_label.image = logo_photo
+            logo_label.pack(side="left", padx=(0, 10))
+        except FileNotFoundError:
+            print(f"Logo file not found at: {logo_path}")
+        except Exception as e:
+            print(f"Error loading logo: {e}")
 
-        # "Manager" in grey
-        manager_label = tk.Label(title_frame, text=" tory", 
-                                font=("Segoe UI", 20, "bold"),
-                                foreground=APP_COLORS["text_secondary"],  # Grey #64748b
-                                bg=APP_COLORS["bg_card"])
-        manager_label.pack(side="left")
+        # Rest of your title text code...
 
         search_frame = ttk.Frame(top)
         search_frame.grid(row=0, column=1, sticky="ew", padx=12)
