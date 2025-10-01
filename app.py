@@ -44,6 +44,162 @@ PRIORITY_COLORS = {
     "archived": "#94a3b8"
 }
 
+
+# ---------- Modern Scrollbar ----------
+class ModernScrollbar(tk.Canvas):
+    """Premium modern scrollbar with smooth animations"""
+    
+    def __init__(self, parent, orient='vertical', command=None, **kwargs):
+        width = 10 if orient == 'vertical' else 10
+        super().__init__(parent, 
+                        width=width if orient == 'vertical' else 200,
+                        height=200 if orient == 'vertical' else width,
+                        highlightthickness=0,
+                        bd=0,
+                        bg='#f8fafc')
+        
+        self.orient = orient
+        self.command = command
+        self.thumb_color = '#cbd5e1'
+        self.thumb_hover_color = '#94a3b8'
+        self.thumb_active_color = '#6366f1'
+        
+        self.thumb = None
+        self.dragging = False
+        self.drag_start_y = 0
+        self.drag_start_x = 0
+        self.first = 0.0
+        self.last = 1.0
+        
+        self.bind('<Enter>', self._on_enter)
+        self.bind('<Leave>', self._on_leave)
+        self.bind('<Button-1>', self._on_press)
+        self.bind('<B1-Motion>', self._on_drag)
+        self.bind('<ButtonRelease-1>', self._on_release)
+        self.bind('<Configure>', self._on_configure)
+    
+    def _on_configure(self, event):
+        """Redraw thumb when canvas is resized"""
+        self._draw_thumb()
+    
+    def set(self, first, last):
+        """Update scrollbar position"""
+        try:
+            self.first = float(first)
+            self.last = float(last)
+            self._draw_thumb()
+        except:
+            pass
+    
+    def _draw_thumb(self):
+        """Draw the scrollbar thumb with rounded edges"""
+        self.delete('all')
+        
+        if self.orient == 'vertical':
+            canvas_height = self.winfo_height()
+            if canvas_height <= 1:
+                return
+            
+            thumb_height = max(40, canvas_height * (self.last - self.first))
+            thumb_y = canvas_height * self.first
+            
+            # Create rounded rectangle effect
+            self._create_rounded_rect(
+                2, thumb_y + 2, 8, thumb_y + thumb_height - 2,
+                radius=3, fill=self.thumb_color, tags='thumb'
+            )
+        else:
+            canvas_width = self.winfo_width()
+            if canvas_width <= 1:
+                return
+            
+            thumb_width = max(40, canvas_width * (self.last - self.first))
+            thumb_x = canvas_width * self.first
+            
+            self._create_rounded_rect(
+                thumb_x + 2, 2, thumb_x + thumb_width - 2, 8,
+                radius=3, fill=self.thumb_color, tags='thumb'
+            )
+    
+    def _create_rounded_rect(self, x1, y1, x2, y2, radius=3, **kwargs):
+        """Create a rounded rectangle"""
+        points = [
+            x1+radius, y1,
+            x2-radius, y1,
+            x2, y1,
+            x2, y1+radius,
+            x2, y2-radius,
+            x2, y2,
+            x2-radius, y2,
+            x1+radius, y2,
+            x1, y2,
+            x1, y2-radius,
+            x1, y1+radius,
+            x1, y1
+        ]
+        return self.create_polygon(points, smooth=True, **kwargs)
+    
+    def _on_enter(self, event):
+        if self.thumb and not self.dragging:
+            self.itemconfig('thumb', fill=self.thumb_hover_color)
+    
+    def _on_leave(self, event):
+        if self.thumb and not self.dragging:
+            self.itemconfig('thumb', fill=self.thumb_color)
+    
+    def _on_press(self, event):
+        if self.thumb:
+            self.dragging = True
+            self.drag_start_y = event.y
+            self.drag_start_x = event.x
+            self.itemconfig('thumb', fill=self.thumb_active_color)
+    
+    def _on_drag(self, event):
+        if self.dragging and self.command:
+            if self.orient == 'vertical':
+                canvas_height = self.winfo_height()
+                if canvas_height <= 1:
+                    return
+                    
+                thumb_height = canvas_height * (self.last - self.first)
+                max_y = canvas_height - thumb_height
+                
+                if max_y > 0:
+                    delta_y = event.y - self.drag_start_y
+                    new_position = (self.first * canvas_height + delta_y) / canvas_height
+                    new_position = max(0, min(1 - (self.last - self.first), new_position))
+                    
+                    self.command('moveto', str(new_position))
+                    self.drag_start_y = event.y
+            else:
+                canvas_width = self.winfo_width()
+                if canvas_width <= 1:
+                    return
+                    
+                thumb_width = canvas_width * (self.last - self.first)
+                max_x = canvas_width - thumb_width
+                
+                if max_x > 0:
+                    delta_x = event.x - self.drag_start_x
+                    new_position = (self.first * canvas_width + delta_x) / canvas_width
+                    new_position = max(0, min(1 - (self.last - self.first), new_position))
+                    
+                    self.command('moveto', str(new_position))
+                    self.drag_start_x = event.x
+    
+    def _on_release(self, event):
+        self.dragging = False
+        if self.thumb:
+            x, y = self.winfo_pointerxy()
+            widget_x = self.winfo_rootx()
+            widget_y = self.winfo_rooty()
+            if (widget_x <= x <= widget_x + self.winfo_width() and 
+                widget_y <= y <= widget_y + self.winfo_height()):
+                self.itemconfig('thumb', fill=self.thumb_hover_color)
+            else:
+                self.itemconfig('thumb', fill=self.thumb_color)
+
+
 # ---------- App ----------
 class TodoApp:
     def __init__(self, root):
@@ -59,7 +215,6 @@ class TodoApp:
         self.style = ttk.Style(root)
         self._setup_style()
 
-        # Load data - archive, finished, then active tasks
         self.archived_tasks = self._load_archived_tasks()
         self.finished_tasks = self._load_finished_tasks()
         self.tasks = self._load_active_tasks()
@@ -74,21 +229,17 @@ class TodoApp:
     def _bind_mousewheel(self, widget, canvas):
         """Bind mouse wheel events to canvas for scrolling"""
         def on_mousewheel(event):
-            # For Windows and MacOS
             if event.num == 5 or event.delta < 0:
                 canvas.yview_scroll(1, "units")
             elif event.num == 4 or event.delta > 0:
                 canvas.yview_scroll(-1, "units")
         
-        # Bind to widget and all its children
         widget.bind("<Enter>", lambda e: self._bind_wheel_to_canvas(canvas))
         widget.bind("<Leave>", lambda e: self._unbind_wheel_from_canvas(canvas))
         
     def _bind_wheel_to_canvas(self, canvas):
         """Bind wheel events when mouse enters the area"""
-        # Windows/Linux
         canvas.bind_all("<MouseWheel>", lambda e: canvas.yview_scroll(int(-1*(e.delta/120)), "units"))
-        # Linux alternative
         canvas.bind_all("<Button-4>", lambda e: canvas.yview_scroll(-1, "units"))
         canvas.bind_all("<Button-5>", lambda e: canvas.yview_scroll(1, "units"))
         
@@ -124,21 +275,20 @@ class TodoApp:
         self.style.configure(".", font=default_font, background=APP_COLORS["bg_main"])
         self.style.configure("TFrame", background=APP_COLORS["bg_main"])
         
-        # Remove borders by setting borderwidth=0
         self.style.configure("Card.TFrame",
             background=APP_COLORS["bg_card"], 
-            relief="flat",  # Changed from "solid" to "flat"
-            borderwidth=0)  # Changed from 1 to 0
+            relief="flat",
+            borderwidth=0)
         
         self.style.configure("Archive.TFrame",
             background=APP_COLORS["bg_card"], 
-            relief="flat",  # Changed from "solid" to "flat"
-            borderwidth=0)  # Changed from 1 to 0
+            relief="flat",
+            borderwidth=0)
         
         self.style.configure("Finished.TFrame",
             background=APP_COLORS["bg_card"], 
-            relief="flat",  # Changed from "solid" to "flat"
-            borderwidth=0)  # Changed from 1 to 0
+            relief="flat",
+            borderwidth=0)
         
         self.style.configure("Header.TLabel",
             font=("Segoe UI", 20, "bold"),
@@ -163,22 +313,15 @@ class TodoApp:
         self.root.configure(bg=APP_COLORS["bg_main"])
 
     def _build_ui(self):
-        # --- Top bar ---
         top = ttk.Frame(self.root, padding=(10), style="Card.TFrame")
         top.grid(row=0, column=0, columnspan=3, sticky="ew", padx=12, pady=(12,6))
         top.columnconfigure(1, weight=1)
 
-        # Create canvas for title with K and O in different color
-        # Logo and title frame
         logo_title_frame = ttk.Frame(top)
         logo_title_frame.grid(row=0, column=0, sticky="w", padx=6)
 
-        # Load and display logo
         try:
-            logo_path = os.path.join(BASE_DIR, "/images/logo.png")  # if in same folder
-            # OR
-            logo_path = os.path.join(BASE_DIR, "images", "logo.png")  # if in subfolder
-            
+            logo_path = os.path.join(BASE_DIR, "images", "logo.png")
             logo_image = Image.open(logo_path)
             logo_image = logo_image.resize((240, 50), Image.LANCZOS)
             logo_photo = ImageTk.PhotoImage(logo_image)
@@ -190,8 +333,6 @@ class TodoApp:
             print(f"Logo file not found at: {logo_path}")
         except Exception as e:
             print(f"Error loading logo: {e}")
-
-        # Rest of your title text code...
 
         search_frame = ttk.Frame(top)
         search_frame.grid(row=0, column=1, sticky="ew", padx=12)
@@ -248,7 +389,7 @@ class TodoApp:
                                    style="Muted.TLabel")
         self.stats_label.grid(row=1, column=0, sticky="w", pady=(8,0))
         
-        # Archive card
+        # Archive card with modern scrollbar
         archive_card = ttk.Frame(left, style="Archive.TFrame", padding=12)
         archive_card.grid(row=1, column=0, sticky="nwse", padx=12, pady=(12,0))
         left.rowconfigure(1, weight=0)
@@ -276,9 +417,9 @@ class TodoApp:
                                       highlightthickness=0, 
                                       bg=APP_COLORS["bg_card"],
                                       height=archive_canvas_height)
-        self.archive_scroll = ttk.Scrollbar(self.archive_frame, 
-                                          orient="vertical", 
-                                          command=self.archive_canvas.yview)
+        self.archive_scroll = ModernScrollbar(self.archive_frame, 
+                                             orient="vertical", 
+                                             command=self.archive_canvas.yview)
         self.archive_list_frame = ttk.Frame(self.archive_canvas)
         
         self.archive_list_frame.bind(
@@ -293,11 +434,10 @@ class TodoApp:
         self.archive_frame.columnconfigure(0, weight=1)
         self.archive_frame.rowconfigure(0, weight=1)
 
-                # Bind mousewheel to archive section
         self._bind_mousewheel(self.archive_frame, self.archive_canvas)
         self._bind_mousewheel(self.archive_canvas, self.archive_canvas)
 
-        # Finished card
+        # Finished card with modern scrollbar
         finished_card = ttk.Frame(left, style="Card.TFrame", padding=12)
         finished_card.grid(row=2, column=0, sticky="nwse", padx=12, pady=(12,0))
         left.rowconfigure(2, weight=1)
@@ -325,9 +465,9 @@ class TodoApp:
                                         highlightthickness=0,
                                         bg=APP_COLORS["bg_card"],
                                         height=finished_canvas_height)
-        self.finished_scroll = ttk.Scrollbar(self.finished_frame,
-                                            orient="vertical",
-                                            command=self.finished_canvas.yview)
+        self.finished_scroll = ModernScrollbar(self.finished_frame,
+                                              orient="vertical",
+                                              command=self.finished_canvas.yview)
         self.finished_list_frame = ttk.Frame(self.finished_canvas)
         self.finished_list_frame.bind(
             "<Configure>",
@@ -340,14 +480,14 @@ class TodoApp:
         self.finished_frame.columnconfigure(0, weight=1)
         self.finished_frame.rowconfigure(0, weight=1)
 
-        # Bind mousewheel to finished section
         self._bind_mousewheel(self.finished_frame, self.finished_canvas)
         self._bind_mousewheel(self.finished_canvas, self.finished_canvas)
 
         self._update_stats()
 
+        # Main task list with modern scrollbar
         self.task_canvas = tk.Canvas(right, borderwidth=0, highlightthickness=0, bg=APP_COLORS["bg_main"])
-        self.task_scroll = ttk.Scrollbar(right, orient="vertical", command=self.task_canvas.yview)
+        self.task_scroll = ModernScrollbar(right, orient="vertical", command=self.task_canvas.yview)
         self.task_frame = ttk.Frame(self.task_canvas, style="TFrame")
 
         self.task_frame.bind(
@@ -360,7 +500,6 @@ class TodoApp:
         self.task_canvas.grid(row=0, column=0, sticky="nswe")
         self.task_scroll.grid(row=0, column=1, sticky="ns")
 
-        # Bind mousewheel to main task list
         self._bind_mousewheel(right, self.task_canvas)
         self._bind_mousewheel(self.task_canvas, self.task_canvas)
 
@@ -779,7 +918,6 @@ class TodoApp:
         )
         badge.grid(row=0, column=0, rowspan=2, sticky="nsw", padx=(0,16))
 
-        # Fixed width title label - exactly 40 characters
         title_txt = self._truncate_text(task.title, max_length=40)
         if task.status == "done":
             title_txt = "✓ " + title_txt
@@ -1217,11 +1355,13 @@ class TodoApp:
         storage.save_tasks(TASKS_PATH, self.tasks)
         self._render_tasks()
 
+
 def main():
     root = tk.Tk()
     app = TodoApp(root)
     root.protocol("WM_DELETE_WINDOW", lambda: on_close(root, app))
     root.mainloop()
+
 
 def on_close(root, app: TodoApp):
     for tid in list(app.timers.keys()):
@@ -1230,6 +1370,7 @@ def on_close(root, app: TodoApp):
     storage.save_tasks(ARCHIVE_PATH, app.archived_tasks)
     storage.save_tasks(FINISHED_PATH, app.finished_tasks)
     root.destroy()
+
 
 if __name__ == "__main__":
     main()
