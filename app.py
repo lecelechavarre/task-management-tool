@@ -330,6 +330,7 @@ class TodoApp:
         self.style.configure("Danger.TButton", background=APP_COLORS["error"], foreground="white")
         self.style.configure("Archive.TButton", background=APP_COLORS["archive"], foreground="white")
         self.style.configure("TEntry", fieldbackground=APP_COLORS["bg_card"], borderwidth=1, relief="solid")
+        self.style.configure("Reopen.TButton", background="#838b94", foreground="white")
         self.root.configure(bg=APP_COLORS["bg_main"])
 
     def _build_ui(self):
@@ -615,7 +616,7 @@ class TodoApp:
         btn_frame = ttk.Frame(item_frame)
         btn_frame.grid(row=0, column=2, sticky="e")
         
-        restore_btn = ttk.Button(btn_frame, text="↩", 
+        restore_btn = ttk.Button(btn_frame, text="🔄", 
                                width=3,
                                style="Archive.TButton",
                                command=lambda t=task: self._restore_task(t))
@@ -674,6 +675,7 @@ class TodoApp:
         
         reopen_btn = ttk.Button(btn_frame, text="🔄", 
                                width=3,
+                               style="Reopen.TButton",
                                command=lambda t=task: self._undo_done(t))
         reopen_btn.grid(row=0, column=0, padx=2)
         
@@ -730,6 +732,7 @@ class TodoApp:
         
         reopen_btn = ttk.Button(btn_frame, text="🔄", 
                                width=3,
+                               style="Reopen.TButton",
                                command=lambda t=task: self._undo_done(t))
         reopen_btn.grid(row=0, column=0, padx=2)
         
@@ -788,6 +791,55 @@ class TodoApp:
         content = ttk.Frame(container, style="Card.TFrame", padding=(25, 20))
         content.pack(fill="both", expand=True)
 
+        # Date information frame - ADD THIS SECTION
+        dates_frame = ttk.Frame(content)
+        dates_frame.pack(fill="x", pady=(0, 20))
+        
+        # Created date
+        try:
+            created_date = datetime.fromisoformat(task.created_at).strftime("%B %d, %Y at %I:%M %p")
+            created_label = ttk.Label(dates_frame,
+                text=f"📅 Created: {created_date}",
+                style="Muted.TLabel")
+            created_label.pack(anchor="w", pady=2)
+        except:
+            pass
+        
+        # Archived date
+        if hasattr(task, 'archived_at') and task.archived_at:
+            try:
+                archived_date = datetime.fromisoformat(task.archived_at).strftime("%B %d, %Y at %I:%M %p")
+                archived_label = ttk.Label(dates_frame,
+                    text=f"🗂️ Archived: {archived_date}",
+                    font=("Segoe UI", 10, "bold"),
+                    foreground=APP_COLORS["archive"])
+                archived_label.pack(anchor="w", pady=2)
+                
+                # Calculate duration
+                created_dt = datetime.fromisoformat(task.created_at)
+                archived_dt = datetime.fromisoformat(task.archived_at)
+                duration = archived_dt - created_dt
+                days = duration.days
+                hours = duration.seconds // 3600
+                minutes = (duration.seconds % 3600) // 60
+                
+                duration_parts = []
+                if days > 0:
+                    duration_parts.append(f"{days} day{'s' if days != 1 else ''}")
+                if hours > 0:
+                    duration_parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+                if minutes > 0:
+                    duration_parts.append(f"{minutes} min{'s' if minutes != 1 else ''}")
+                
+                duration_str = ", ".join(duration_parts) if duration_parts else "Less than a minute"
+                
+                duration_label = ttk.Label(dates_frame,
+                    text=f"⏱️ Active Duration: {duration_str}",
+                    style="Muted.TLabel")
+                duration_label.pack(anchor="w", pady=2)
+            except:
+                pass
+
         desc_frame = ttk.Frame(content)
         desc_frame.pack(fill="both", expand=True, pady=(0, 20))
         
@@ -811,10 +863,16 @@ class TodoApp:
         btn_frame.pack(fill="x")
 
         restore_btn = ttk.Button(btn_frame,
-            text="↩️ Restore Task",
+            text="🔄 Restore Task",
             style="Archive.TButton",
             command=lambda: [modal.destroy(), self._restore_task(task)])
         restore_btn.pack(side="left")
+
+        delete_btn = ttk.Button(btn_frame,
+            text="🗑️ Delete Permanently",
+            style="Danger.TButton",
+            command=lambda: [modal.destroy(), self._permanently_delete_task(task)])
+        delete_btn.pack(side="left", padx=8)
 
         close_btn = ttk.Button(btn_frame,
             text="Close",
@@ -957,6 +1015,7 @@ class TodoApp:
     def _restore_task(self, task: Task):
         self.archived_tasks = [t for t in self.archived_tasks if t.id != task.id]
         task.status = "pending"
+        task.archived_at = None  # ADD THIS LINE - Clear the archived timestamp
         self.tasks.append(task)
         
         storage.save_tasks(TASKS_PATH, self.tasks)
@@ -993,6 +1052,7 @@ class TodoApp:
         self.tasks = [t for t in self.tasks if t.id != task.id]
         
         task.status = "archived"
+        task.archived_at = datetime.now().isoformat()  # ADD THIS LINE
         self.archived_tasks.append(task)
         
         storage.save_tasks(TASKS_PATH, self.tasks)
@@ -1002,7 +1062,7 @@ class TodoApp:
         self._update_stats()
         self._render_archive()
         
-        logging.info(f"Archived task {task.id}: {task.title}")
+        logging.info(f"Archived task {task.id}: {task.title} at {task.archived_at}")
 
     def _toggle_sort(self, btn):
         self.sort_newest = not self.sort_newest
