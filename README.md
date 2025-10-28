@@ -14,8 +14,6 @@ Features:
 - Recommended screen size: 1024×600 or larger for best layout.
 
 ## How to run
-1. Unzip the project folder.
-2. In a terminal, run:
 ```bash
 python app.py
 ```
@@ -40,5 +38,3 @@ todo_manager_gui/
 - Concurrency: currently this is a single-process app. Atomic writes are used to reduce corruption risk.
 - Backup: corrupt JSONs are backed up to `tasks.json.bak`.
 - Future: export to CSV, web UI, login/multi-user, notifications.
-
-Enjoy! — built as a polished, simple, single-user desktop app.
