@@ -99,7 +99,7 @@ class ModernScrollbar(tk.Canvas):
             canvas_height = self.winfo_height()
             if canvas_height <= 1:
                 return
-            
+              
             thumb_height = max(40, canvas_height * (self.last - self.first))
             thumb_y = canvas_height * self.first
             
