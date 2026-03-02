@@ -21,7 +21,7 @@ LOG_PATH = os.path.join(BASE_DIR, "todo.log")
 logging.basicConfig(filename=LOG_PATH, level=logging.INFO,
                     format="%(asctime)s %(levelname)s %(message)s")
 
-# Modern Color scheme
+# Color scheme
 APP_COLORS = {
     "bg_main": "#ffffff",
     "bg_card": "#ffffff",
