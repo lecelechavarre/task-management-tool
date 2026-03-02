@@ -11,7 +11,7 @@ from todo.utils import format_duration
 from PIL import Image, ImageTk
 
 
-# ---------- Configuration ----------
+# ---------- Configuration ---------- #
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 TASKS_PATH = os.path.join(BASE_DIR, "tasks.json")
 ARCHIVE_PATH = os.path.join(BASE_DIR, "archive.json")
