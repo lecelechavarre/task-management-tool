@@ -200,7 +200,7 @@ class ModernScrollbar(tk.Canvas):
                 self.itemconfig('thumb', fill=self.thumb_color)
 
 
-# ---------- App ----------
+# ---------- App ---------- #
 class TodoApp:
     def __init__(self, root):
         self.root = root
