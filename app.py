@@ -45,7 +45,7 @@ PRIORITY_COLORS = {
 }
 
 
-# ---------- Modern Scrollbar ----------
+# ---------- Modern Scrollbar ---------- #
 class ModernScrollbar(tk.Canvas):
     """Premium modern scrollbar with smooth animations"""
     
