@@ -34,3 +34,4 @@ def get_next_id(tasks: List[Task]) -> int:
     if not tasks:
         return 1
     return max(task.id for task in tasks) + 1
+
