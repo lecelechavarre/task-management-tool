@@ -1,4 +1,4 @@
-# To-Do Task Manager
+# To-Do Task Manager 
 Python • Tkinter • JSON Persistence
 
 A single-user, desktop-based task management application built with Python and Tkinter.  
