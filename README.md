@@ -4,7 +4,7 @@ Python • Tkinter • JSON
 A single-user, desktop-based task management application built with Python and Tkinter.  
 Designed with clear separation of concerns, atomic persistence guarantees, and a minimal dependency footprint.
  
----
+--- 
 
 ## 1. Purpose 
  
