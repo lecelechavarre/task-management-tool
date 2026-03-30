@@ -15,7 +15,7 @@ This project provides a lightweight, local task management system intended for:
 - Educational demonstration of layered Python architecture
 - Simple desktop task tracking without external dependencies
 
-The application prioritizes:
+The application prioritizes: 
 
 - Data integrity
 - Maintainable architecture
