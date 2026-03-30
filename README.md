@@ -8,7 +8,7 @@ Designed with clear separation of concerns, atomic persistence guarantees, and a
 
 ## 1. Purpose
 
-This project provides a lightweight, local task management system intended for:
+This project provides a lightweight, local task management system intended for: 
 
 - Personal productivity
 - Offline-first environments
