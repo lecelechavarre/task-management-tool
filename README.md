@@ -32,13 +32,10 @@ The application follows a layered design to maintain separation of concerns:
 ```
 GUI Layer (app.py)
         │
-        ▼
 Domain Layer (todo/models.py)
         │
-        ▼
 Persistence Layer (todo/storage.py)
         │
-        ▼
 JSON File (tasks.json)
 ```
 
